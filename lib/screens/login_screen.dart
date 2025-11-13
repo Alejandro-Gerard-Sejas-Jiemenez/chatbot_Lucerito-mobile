@@ -3,6 +3,7 @@ import '../styles/app_colors.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/primary_button.dart';
 import '../services/auth_service.dart';
+import 'menu_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -19,13 +20,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _doLogin() async {
     setState(() => _loading = true);
-    final success = await _auth.login(_userController.text.trim(), _passController.text);
-    setState(() => _loading = false);
-    final snack = SnackBar(content: Text(success ? 'Inicio de sesión correcto' : 'Usuario o contraseña inválidos'));
-    ScaffoldMessenger.of(context).showSnackBar(snack);
-    if (success) {
-      // TODO: navegar a la siguiente pantalla
+    try {
+      final success = await _auth.login(_userController.text.trim(), _passController.text);
+      if (!mounted) return;
+      setState(() => _loading = false);
+      final snack = SnackBar(content: Text(success ? 'Inicio de sesión correcto' : 'Usuario o contraseña inválidos'));
+      ScaffoldMessenger.of(context).showSnackBar(snack);
+      if (success) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MenuScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e, st) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      // ignore: avoid_print
+      print('Login error: $e\n$st');
     }
+  }
+
+  @override
+  void dispose() {
+    _userController.dispose();
+    _passController.dispose();
+    super.dispose();
   }
 
   @override
