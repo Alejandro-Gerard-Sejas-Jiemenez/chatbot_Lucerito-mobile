@@ -21,7 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _doLogin() async {
     setState(() => _loading = true);
     try {
-      final success = await _auth.login(_userController.text.trim(), _passController.text);
+      final success = await _auth.login(_userController.text.trim(), _passController.text.trim());
       if (!mounted) return;
       setState(() => _loading = false);
       final snack = SnackBar(content: Text(success ? 'Inicio de sesión correcto' : 'Usuario o contraseña inválidos'));
