@@ -4,6 +4,8 @@ import '../widgets/custom_text_field.dart';
 import '../widgets/primary_button.dart';
 import '../services/auth_service.dart';
 import 'menu_screen.dart';
+import '../utils/background_location_sender.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -27,6 +29,9 @@ class _LoginScreenState extends State<LoginScreen> {
       final snack = SnackBar(content: Text(success ? 'Inicio de sesión correcto' : 'Usuario o contraseña inválidos'));
       ScaffoldMessenger.of(context).showSnackBar(snack);
       if (success) {
+        // Iniciar envío de ubicación en background automáticamente
+        BackgroundLocationSender sender = BackgroundLocationSender();
+        sender.start();
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const MenuScreen()),
           (route) => false,

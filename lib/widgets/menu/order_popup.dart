@@ -1,13 +1,10 @@
-import 'package:flutter/material.dart';
 
-import '../../data/mock_data.dart';
+import 'package:flutter/material.dart';
 import '../../data/models/pedido.dart';
-import '../../data/models/usuario.dart';
-import '../../data/models/ubicacion.dart';
 import '../../screens/mapa_screen.dart';
 
 class OrderPopup extends StatelessWidget {
-  final MockOrder pedido;
+  final Pedido pedido;
   const OrderPopup({Key? key, required this.pedido}) : super(key: key);
 
   @override
@@ -39,9 +36,17 @@ class OrderPopup extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
+              const Icon(Icons.confirmation_number, color: Color(0xFF757575), size: 20),
+              const SizedBox(width: 8),
+              Text('ID: ${pedido.id}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
               const Icon(Icons.person_outline, color: Color(0xFF757575), size: 20),
               const SizedBox(width: 8),
-              Text(pedido.client, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+              Text(pedido.usuario.nombre, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
             ],
           ),
           const SizedBox(height: 8),
@@ -57,7 +62,7 @@ class OrderPopup extends StatelessWidget {
             children: [
               const Icon(Icons.assignment_turned_in_outlined, color: Color(0xFF1976D2), size: 20),
               const SizedBox(width: 8),
-              Text(pedido.status, style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 15)),
+              Text(pedido.estado, style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 15)),
             ],
           ),
           const SizedBox(height: 18),
@@ -91,22 +96,6 @@ class OrderPopup extends StatelessWidget {
                 ),
                 onPressed: () {
                   Navigator.of(context).pop();
-                  // Crear ubicaciones de ejemplo para el local y el cliente
-                  final pedido = Pedido(
-                    id: int.tryParse(this.pedido.id) ?? 0,
-                    usuario: Usuario(
-                      id: 1,
-                      nombre: this.pedido.client,
-                      correo: '',
-                      telefono: this.pedido.phone,
-                      direccion: this.pedido.address,
-                    ),
-                    productos: [],
-                    total: this.pedido.total,
-                    estado: this.pedido.status,
-                    ubicacionLocal: Ubicacion(latitud: -17.783327, longitud: -63.18213), // Ejemplo SCZ centro
-                    ubicacionCliente: Ubicacion(latitud: -17.789, longitud: -63.180), // Ejemplo cercano
-                  );
                   Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => MapaScreen(pedido: pedido),
                   ));

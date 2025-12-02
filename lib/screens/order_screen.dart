@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../widgets/info_tile.dart';
 import '../styles/app_colors.dart';
 import '../widgets/map_placeholder.dart';
+
 import '../data/mock_data.dart';
+import '../services/order_service.dart';
 
 class OrderScreen extends StatelessWidget {
   final MockOrder order;
@@ -171,9 +173,23 @@ class OrderScreen extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
-                      onPressed: () {
-                        // TODO: cancelar pedido action
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cancelar pedido')));
+                      onPressed: () async {
+                        // Usa el username del usuario logueado como deliveryId
+                        final deliveryId = currentUser.username;
+                        final success = await OrderService().rejectOrder(
+                          int.tryParse(order.id) ?? 0,
+                          deliveryId,
+                        );
+                        if (success) {
+                          Navigator.of(context).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Pedido rechazado correctamente')),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Error al rechazar el pedido')),
+                          );
+                        }
                       },
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Colors.redAccent),

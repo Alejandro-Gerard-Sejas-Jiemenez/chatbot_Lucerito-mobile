@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../styles/app_colors.dart';
-import '../services/pedido_service.dart';
-import '../data/mock_data.dart';
+import '../services/order_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../data/models/pedido.dart';
 import 'dart:async';
 import '../utils/location_helper.dart';
 import '../widgets/menu/menu_header.dart';
@@ -9,6 +10,7 @@ import '../widgets/menu/stat_card.dart';
 import '../widgets/menu/assigned_orders_list.dart';
 import '../widgets/menu/completed_orders_list.dart';
 import '../widgets/menu/order_popup.dart';
+
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({Key? key}) : super(key: key);
@@ -19,8 +21,8 @@ class MenuScreen extends StatefulWidget {
 
 class _MenuScreenState extends State<MenuScreen> {
   Timer? _pollingTimer;
-    MockOrder? _ultimoPedidoMostrado;
-  final PedidoService _pedidoService = PedidoService();
+  Pedido? _ultimoPedidoMostrado;
+  final OrderService _orderService = OrderService();
 
   @override
   void initState() {
@@ -31,11 +33,18 @@ class _MenuScreenState extends State<MenuScreen> {
 
   void _startPolling() {
     _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
-      final pedido = await _pedidoService.getPedidoAsignado();
-      if (pedido != null && pedido.id != _ultimoPedidoMostrado?.id) {
-        _ultimoPedidoMostrado = pedido;
-        if (mounted) {
-          _mostrarPopupPedido(pedido);
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('username') ?? '';
+      final deliveryId = prefs.getInt('user_id'); // Asegúrate de guardar el id al hacer login
+      if (deliveryId == null) return;
+      final orders = await _orderService.getOrdersByDelivery(deliveryId);
+      if (orders.isNotEmpty) {
+        final pedido = Pedido.fromJson(orders.first);
+        if (_ultimoPedidoMostrado == null || pedido.id != _ultimoPedidoMostrado?.id) {
+          _ultimoPedidoMostrado = pedido;
+          if (mounted) {
+            _mostrarPopupPedido(pedido);
+          }
         }
       }
     });
@@ -47,7 +56,7 @@ class _MenuScreenState extends State<MenuScreen> {
     super.dispose();
   }
 
-  void _mostrarPopupPedido(MockOrder pedido) {
+  void _mostrarPopupPedido(Pedido pedido) {
     showDialog(
       context: context,
       barrierDismissible: false,

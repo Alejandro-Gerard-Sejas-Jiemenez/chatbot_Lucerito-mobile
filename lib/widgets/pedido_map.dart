@@ -8,6 +8,8 @@ import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import '../data/models/pedido.dart';
 import '../utils/route_utils.dart';
+import '../services/location_service.dart';
+import '../config/api_config.dart';
 
 typedef RouteInfoCallback = void Function(double? distance, double? duration);
 
@@ -27,20 +29,31 @@ class PedidoMap extends StatefulWidget {
   State<PedidoMap> createState() => _PedidoMapState();
 }
 
+
 class _PedidoMapState extends State<PedidoMap> {
   LatLng? _conductorPos;
   bool _loading = true;
   StreamSubscription<Position>? _positionStream;
+  Timer? _locationTimer;
 
   List<LatLng>? _routePoints;
   double? _routeDistance; // metros
   double? _routeDuration; // segundos
   bool _routeLoading = false;
 
+  late final LocationService _locationService;
+
   @override
   void initState() {
     super.initState();
     _initLocationStream();
+    _locationService = LocationService(baseUrl: ApiConfig.baseUrl);
+    // Enviar ubicación cada 2 minutos
+    _locationTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      if (_conductorPos != null) {
+        _sendLocationToBackend(_conductorPos!.latitude, _conductorPos!.longitude);
+      }
+    });
   }
 
   void _initLocationStream() async {
@@ -76,10 +89,44 @@ class _PedidoMapState extends State<PedidoMap> {
             _loading = false;
           });
           _fetchRoute();
+          _sendLocationToBackend(pos.latitude, pos.longitude);
         }
       });
     } catch (_) {
       setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _sendLocationToBackend(double lat, double lon) async {
+    final response = await _locationService.sendLocation(latitud: lat, longitud: lon);
+    if (response != null) {
+      print('id_orden_actual recibido: ${response['id_orden_actual']}');
+      if (response['id_orden_actual'] != null) {
+        // Mostrar el popup para aceptar/rechazar
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Nueva orden asignada'),
+            content: Text('¿Deseas aceptar la orden #${response['id_orden_actual']}?'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  // Acción de rechazar (puedes agregar lógica aquí)
+                },
+                child: const Text('Rechazar'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  // Acción de aceptar (puedes agregar lógica aquí)
+                },
+                child: const Text('Aceptar'),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
@@ -111,6 +158,7 @@ class _PedidoMapState extends State<PedidoMap> {
   @override
   void dispose() {
     _positionStream?.cancel();
+    _locationTimer?.cancel();
     super.dispose();
   }
 
