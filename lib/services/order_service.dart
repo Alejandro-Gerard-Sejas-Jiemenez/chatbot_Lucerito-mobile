@@ -26,8 +26,20 @@ class OrderService {
     return response.statusCode == 200;
   }
 
-  // (Opcional) Aceptar una orden (si tienes endpoint)
-  // Future<bool> acceptOrder(int ordenCod, int deliveryId) async {
-  //   // Implementar si existe endpoint
-  // }
+  // Obtiene los detalles de una orden específica por su ID
+  Future<Map<String, dynamic>?> getOrderById(int ordenId) async {
+    final url = Uri.parse('$baseUrl/orden/$ordenId');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        print('Error al obtener orden: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error al obtener orden: $e');
+      return null;
+    }
+  }
 }

@@ -1,14 +1,10 @@
-
-
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 
-
 class AuthService {
-
   Future<bool> login(String username, String password) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/auth/login');
     final response = await http.post(
@@ -27,13 +23,14 @@ class AuthService {
     return false;
   }
 
-
   // Decodifica el JWT y extrae el id del usuario (campo 'id')
   int? getUserIdFromToken(String token) {
     try {
       final parts = token.split('.');
       if (parts.length != 3) return null;
-      final payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+      final payload = utf8.decode(
+        base64Url.decode(base64Url.normalize(parts[1])),
+      );
       final payloadMap = json.decode(payload);
       return payloadMap['id'];
     } catch (_) {
