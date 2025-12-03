@@ -6,6 +6,8 @@ import '../services/auth_service.dart';
 import '../config/api_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/models/pedido.dart';
+import '../data/models/usuario.dart';
+import '../data/models/ubicacion.dart';
 import 'dart:async';
 import '../utils/location_helper.dart';
 import '../utils/background_location_sender.dart';
@@ -106,94 +108,115 @@ class _MenuScreenState extends State<MenuScreen> {
     // Guardar referencia al context antes de operaciones asíncronas
     final dialogContext = context;
     
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt_token');
-    if (token == null) {
-      print('ERROR: No hay token JWT, no se puede mostrar el popup');
-      return;
-    }
-    final AuthService authService = AuthService();
-    final deliveryId = authService.getUserIdFromToken(token);
-    print('Delivery ID obtenido del token: $deliveryId');
-    if (deliveryId == null) {
-      print(
-        'ERROR: No se pudo extraer el ID del token, no se puede mostrar el popup',
-      );
-      return;
-    }
-    
-    // Verificar que el widget siga montado después de las operaciones asíncronas
-    if (!mounted) {
-      print('ERROR: Widget ya no está montado después de obtener datos');
-      return;
-    }
-    
-    print('Mostrando AlertDialog para orden #$idOrden');
-    showDialog(
-      context: dialogContext,
-      barrierDismissible: false,
-      builder: (dialogCtx) {
-        print('Builder del AlertDialog ejecutado');
-        return AlertDialog(
-          title: const Text('Nueva orden asignada'),
-          content: Text('¿Deseas aceptar la orden #$idOrden?'),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                final navContext = dialogCtx;
-                Navigator.of(navContext).pop();
-                // Rechazar la orden
-                final success = await _orderService.rejectOrder(
-                  idOrden,
-                  deliveryId,
-                );
-                if (!mounted) return;
-                if (success) {
-                  ScaffoldMessenger.of(navContext).showSnackBar(
-                    const SnackBar(
-                      content: Text('Orden rechazada exitosamente'),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(navContext).showSnackBar(
-                    const SnackBar(content: Text('Error al rechazar la orden')),
-                  );
-                }
-              },
-              child: const Text('Rechazar'),
-            ),
-            TextButton(
-              onPressed: () async {
-                final navContext = dialogCtx;
-                Navigator.of(navContext).pop();
-                // Aceptar la orden (actualizar estado a "en camino")
-                final url = Uri.parse(
-                  '${ApiConfig.baseUrl}/orden/$idOrden/estado',
-                );
-                final response = await http.put(
-                  url,
-                  headers: {'Content-Type': 'application/json'},
-                  body: jsonEncode({'estado': 'en camino'}),
-                );
-                if (!mounted) return;
-                if (response.statusCode == 200) {
-                  ScaffoldMessenger.of(navContext).showSnackBar(
-                    const SnackBar(
-                      content: Text('Orden aceptada exitosamente'),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(navContext).showSnackBar(
-                    const SnackBar(content: Text('Error al aceptar la orden')),
-                  );
-                }
-              },
-              child: const Text('Aceptar'),
-            ),
-          ],
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('jwt_token');
+        if (token == null) {
+          print('ERROR: No hay token JWT, no se puede mostrar el popup');
+          return;
+        }
+        final AuthService authService = AuthService();
+        final deliveryId = authService.getUserIdFromToken(token);
+        print('Delivery ID obtenido del token: $deliveryId');
+        if (deliveryId == null) {
+          print('ERROR: No se pudo extraer el ID del token, no se puede mostrar el popup');
+          return;
+        }
+
+        showDialog(
+          context: dialogContext,
+          barrierDismissible: false,
+          builder: (dialogCtx) {
+            print('Builder del AlertDialog ejecutado');
+            return AlertDialog(
+              title: const Text('Nueva orden asignada'),
+              content: Text('¿Deseas aceptar la orden #$idOrden?'),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    Navigator.of(dialogCtx).pop();
+                    // Rechazar la orden
+                    final success = await _orderService.rejectOrder(
+                      idOrden,
+                      deliveryId,
+                    );
+                    if (!mounted) return;
+                    if (success) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Orden rechazada exitosamente'),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Error al rechazar la orden')),
+                      );
+                    }
+                  },
+                  child: const Text('Rechazar'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    Navigator.of(dialogCtx).pop();
+                    // Aceptar la orden (actualizar estado a "en camino")
+                    final url = Uri.parse(
+                      '${ApiConfig.baseUrl}/orden/$idOrden/estado',
+                    );
+                    final response = await http.put(
+                      url,
+                      headers: {'Content-Type': 'application/json'},
+                      body: jsonEncode({'estado': 'pendiente'}),
+                    );
+                    if (!mounted) return;
+                    if (response.statusCode == 200) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Orden aceptada exitosamente'),
+                        ),
+                      );
+                      // Obtener ubicación de la orden desde el servicio
+                      final ubicacion = await _orderService.obtenerUbicacionOrden(idOrden);
+                      if (ubicacion != null) {
+                        final lat = ubicacion['latitud'];
+                        final lng = ubicacion['longitud'];
+                        // Crear objetos mínimos para Pedido
+                        final pedidoSimulado = Pedido(
+                          id: idOrden,
+                          usuario: Usuario(
+                            id: 0,
+                            nombre: 'Desconocido',
+                            correo: '',
+                            telefono: '',
+                            direccion: '',
+                          ),
+                          productos: [],
+                          total: 0.0,
+                          estado: 'pendiente',
+                          ubicacionLocal: Ubicacion(latitud: lat ?? 0.0, longitud: lng ?? 0.0),
+                          ubicacionCliente: Ubicacion(latitud: lat ?? 0.0, longitud: lng ?? 0.0),
+                        );
+                        print('Pedido simulado: ' + pedidoSimulado.toString());
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => MapaScreen(pedido: pedidoSimulado),
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('No se pudo obtener la ubicación de la orden')),
+                        );
+                      }
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Error al aceptar la orden')),
+                      );
+                    }
+                  },
+                  child: const Text('Aceptar'),
+                ),
+              ],
+            );
+          },
         );
-      },
-    );
   }
 
   @override

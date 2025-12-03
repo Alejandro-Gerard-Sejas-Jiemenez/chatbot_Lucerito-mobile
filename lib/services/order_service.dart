@@ -1,3 +1,4 @@
+
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
@@ -41,5 +42,19 @@ class OrderService {
       print('Error al obtener orden: $e');
       return null;
     }
+  }
+
+
+    Future<Map<String, double>?> obtenerUbicacionOrden(int idOrden) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/orden/$idOrden/ubicacion');
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return {
+        'latitud': (data['latitud'] as num).toDouble(),
+        'longitud': (data['longitud'] as num).toDouble(),
+      };
+    }
+    return null;
   }
 }

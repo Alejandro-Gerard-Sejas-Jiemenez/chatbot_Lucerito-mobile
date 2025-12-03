@@ -2,6 +2,11 @@
 import 'package:flutter/material.dart';
 import '../../data/models/pedido.dart';
 import '../../screens/mapa_screen.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/auth_service.dart';
+import '../../config/api_config.dart';
 
 class OrderPopup extends StatelessWidget {
   final Pedido pedido;
@@ -80,7 +85,41 @@ class OrderPopup extends StatelessWidget {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () async {
+                  // Obtener el deliveryId desde el token guardado
+                  final prefs = await SharedPreferences.getInstance();
+                  final token = prefs.getString('jwt_token');
+                  int? deliveryId;
+                  if (token != null) {
+                    deliveryId = AuthService().getUserIdFromToken(token);
+                  }
+                  if (deliveryId == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('No se pudo obtener el ID del delivery')),
+                    );
+                    Navigator.of(context).pop();
+                    return;
+                  }
+                  final url = Uri.parse('${ApiConfig.baseUrl}/orden/${pedido.id}/rechazar');
+                  final response = await http.post(
+                    url,
+                    headers: {'Content-Type': 'application/json'},
+                    body: jsonEncode({
+                      'delivery_id': deliveryId,
+                      'comentario': 'Orden rechazada por el delivery',
+                    }),
+                  );
+                  Navigator.of(context).pop();
+                  if (response.statusCode == 200) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Orden rechazada exitosamente')),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error al rechazar la orden: ${response.body}')),
+                    );
+                  }
+                },
                 child: const Text('No aceptar', style: TextStyle(fontWeight: FontWeight.w600)),
               ),
             ),
@@ -94,11 +133,64 @@ class OrderPopup extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   elevation: 0,
                 ),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => MapaScreen(pedido: pedido),
-                  ));
+                onPressed: () async {
+                  // Actualizar estado de la orden a 'completada' antes de procesar
+                  final estadoUrl = Uri.parse('${ApiConfig.baseUrl}/orden/${pedido.id}/estado');
+                  final estadoResponse = await http.put(
+                    estadoUrl,
+                    headers: {'Content-Type': 'application/json'},
+                    body: jsonEncode({'estado': 'pendiente'}),
+                  );
+                  if (estadoResponse.statusCode == 200) {
+                    // Obtener ubicación actual del cliente
+                    double latitudCliente = 0.0;
+                    double longitudCliente = 0.0;
+                    // Si tienes un LocationHelper, úsalo aquí
+                    // Ejemplo:
+                    // final position = await LocationHelper.getCurrentPosition();
+                    // latitudCliente = position?.latitude ?? 0.0;
+                    // longitudCliente = position?.longitude ?? 0.0;
+
+                    final url = Uri.parse('${ApiConfig.baseUrl}/orden/${pedido.id}/procesar');
+                    final response = await http.post(
+                      url,
+                      headers: {'Content-Type': 'application/json'},
+                      body: jsonEncode({
+                        'latitud_cliente': latitudCliente,
+                        'longitud_cliente': longitudCliente,
+                      }),
+                    );
+                    Navigator.of(context).pop();
+                    if (response.statusCode == 200) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Orden aceptada y procesada exitosamente')),
+                      );
+                      // Puedes navegar al mapa o refrescar la UI aquí
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => MapaScreen(pedido: pedido),
+                      ));
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error al procesar la orden: ${response.body}')),
+                      );
+                    }
+                  } else {
+                    Navigator.of(context).pop();
+                    String errorMsg = 'Error al actualizar estado';
+                    try {
+                      final errorJson = jsonDecode(estadoResponse.body);
+                      if (errorJson is Map && errorJson.containsKey('error')) {
+                        errorMsg = errorJson['error'];
+                      } else {
+                        errorMsg = estadoResponse.body;
+                      }
+                    } catch (_) {
+                      errorMsg = estadoResponse.body;
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(errorMsg)),
+                    );
+                  }
                 },
                 child: const Text('Aceptar', style: TextStyle(fontWeight: FontWeight.w600)),
               ),

@@ -31,6 +31,13 @@ class PedidoMap extends StatefulWidget {
 
 
 class _PedidoMapState extends State<PedidoMap> {
+    void _centrarMapaEntrePuntos(LatLng punto1, LatLng punto2) {
+      final centerLat = (punto1.latitude + punto2.latitude) / 2;
+      final centerLng = (punto1.longitude + punto2.longitude) / 2;
+      final center = LatLng(centerLat, centerLng);
+      _mapController.move(center, 15); // 15 es el zoom, ajusta si quieres
+    }
+  final MapController _mapController = MapController();
   LatLng? _conductorPos;
   bool _loading = true;
   StreamSubscription<Position>? _positionStream;
@@ -64,6 +71,10 @@ class _PedidoMapState extends State<PedidoMap> {
         setState(() => _loading = false);
         return;
       }
+        // Centrar el mapa cuando se actualiza la posición del conductor
+        if (_conductorPos != null) {
+          _centrarMapaEntrePuntos(_conductorPos!, LatLng(widget.pedido.ubicacionLocal.latitud, widget.pedido.ubicacionLocal.longitud));
+        }
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -135,6 +146,10 @@ class _PedidoMapState extends State<PedidoMap> {
     final destino = widget.toCliente
         ? LatLng(widget.pedido.ubicacionCliente.latitud, widget.pedido.ubicacionCliente.longitud)
         : LatLng(widget.pedido.ubicacionLocal.latitud, widget.pedido.ubicacionLocal.longitud);
+    // Centrar el mapa cuando se obtiene la ruta
+    if (_conductorPos != null) {
+      _centrarMapaEntrePuntos(_conductorPos!, LatLng(widget.pedido.ubicacionLocal.latitud, widget.pedido.ubicacionLocal.longitud));
+    }
     setState(() => _routeLoading = true);
     try {
       final result = await RouteUtils.getRoute(_conductorPos!, destino);
@@ -174,7 +189,8 @@ class _PedidoMapState extends State<PedidoMap> {
       children: [
         Expanded(
           child: FlutterMap(
-            options: MapOptions(
+              mapController: _mapController,
+              options: MapOptions(
               initialCenter: _conductorPos ?? local,
               initialZoom: 15,
             ),
