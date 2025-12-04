@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
-
 class MapBottomMenu extends StatelessWidget {
   final VoidCallback? onArrived;
   final VoidCallback? onCancel;
   final bool arrivedEnabled;
   final double? distance; // metros
   final double? duration; // segundos
+  final bool toRestaurante;
+  final bool toLocal;
   final bool toCliente;
 
   const MapBottomMenu({
@@ -16,6 +17,8 @@ class MapBottomMenu extends StatelessWidget {
     this.arrivedEnabled = true,
     this.distance,
     this.duration,
+    this.toRestaurante = false,
+    this.toLocal = false,
     this.toCliente = false,
   }) : super(key: key);
 
@@ -47,14 +50,20 @@ class MapBottomMenu extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     '${(distance! / 1000).toStringAsFixed(2)} km',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Icon(Icons.timer, color: Colors.blueGrey[700]),
                   const SizedBox(width: 8),
                   Text(
                     _formatDuration(duration!),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                 ],
               ),
@@ -62,43 +71,73 @@ class MapBottomMenu extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              if (!toCliente)
-                ElevatedButton.icon(
-                  onPressed: onArrived,
-                  icon: const Icon(Icons.check_circle_outline),
-                  label: const Text('Confirmar llegada'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              // Botón principal que cambia según la fase
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: ElevatedButton.icon(
+                    onPressed: onArrived,
+                    icon: Icon(
+                      toRestaurante
+                          ? Icons.check_circle_outline
+                          : toLocal
+                          ? Icons.shopping_bag
+                          : Icons.delivery_dining,
+                    ),
+                    label: Text(
+                      toRestaurante
+                          ? 'Confirmar llegada'
+                          : toLocal
+                          ? 'Pedido recogido'
+                          : 'Pedido entregado',
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: toRestaurante
+                          ? Colors.green
+                          : toLocal
+                          ? Colors.orange
+                          : Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
                 ),
-              if (!toCliente)
-                OutlinedButton.icon(
-                  onPressed: onCancel,
-                  icon: const Icon(Icons.cancel_outlined),
-                  label: const Text('Cancelar'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              if (toCliente)
-                ElevatedButton.icon(
-                  onPressed: onArrived,
-                  icon: const Icon(Icons.delivery_dining),
-                  label: const Text('Confirmar entrega al cliente'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              // Botón cancelar solo visible en fase de restaurante
+              if (toRestaurante && onCancel != null)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                    child: OutlinedButton.icon(
+                      onPressed: onCancel,
+                      icon: const Icon(Icons.cancel_outlined),
+                      label: const Text('Cancelar'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
             ],

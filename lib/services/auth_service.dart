@@ -17,6 +17,13 @@ class AuthService {
       if (token.isNotEmpty) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt_token', token);
+
+        // Extraer y guardar el delivery_id del token
+        final deliveryId = getUserIdFromToken(token);
+        if (deliveryId != null) {
+          await prefs.setString('delivery_id', deliveryId.toString());
+        }
+
         return true;
       }
     }

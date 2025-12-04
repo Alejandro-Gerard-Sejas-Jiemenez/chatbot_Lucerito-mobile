@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
-import '../config/api_config.dart';
 
 class LocationService {
   Future<Map<String, dynamic>?> pollCurrentOrderWithDummyLocation({

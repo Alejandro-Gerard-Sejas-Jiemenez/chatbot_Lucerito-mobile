@@ -67,19 +67,27 @@ class BackgroundLocationSender {
         print('Ubicación enviada correctamente al servidor');
         print('Respuesta del servidor: $result');
 
-        // Verificar si hay una nueva orden asignada
-        if (result['id_orden_actual'] != null) {
+        // Verificar si hay una nueva orden asignada (debe ser diferente de null)
+        if (result.containsKey('id_orden_actual') &&
+            result['id_orden_actual'] != null) {
           final idOrden = result['id_orden_actual'] as int;
-          print('¡Nueva orden detectada! ID: $idOrden');
+          print('¡Nueva orden detectada en respuesta! ID: $idOrden');
 
           // Llamar al callback si está registrado
           if (onNewOrderReceived != null) {
+            print(
+              'Ejecutando callback para mostrar notificación de orden #$idOrden',
+            );
             onNewOrderReceived!(idOrden);
           } else {
             print(
               'ADVERTENCIA: Hay una nueva orden pero no hay callback registrado para mostrarla',
             );
           }
+        } else {
+          print(
+            'No hay orden nueva asignada (id_orden_actual es null o no existe)',
+          );
         }
       } else {
         print('Falló el envío de ubicación al servidor');

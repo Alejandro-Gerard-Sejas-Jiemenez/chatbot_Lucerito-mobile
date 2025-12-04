@@ -5,7 +5,6 @@ import '../widgets/primary_button.dart';
 import '../services/auth_service.dart';
 import 'menu_screen.dart';
 import '../utils/background_location_sender.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -23,10 +22,19 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _doLogin() async {
     setState(() => _loading = true);
     try {
-      final success = await _auth.login(_userController.text.trim(), _passController.text.trim());
+      final success = await _auth.login(
+        _userController.text.trim(),
+        _passController.text.trim(),
+      );
       if (!mounted) return;
       setState(() => _loading = false);
-      final snack = SnackBar(content: Text(success ? 'Inicio de sesión correcto' : 'Usuario o contraseña inválidos'));
+      final snack = SnackBar(
+        content: Text(
+          success
+              ? 'Inicio de sesión correcto'
+              : 'Usuario o contraseña inválidos',
+        ),
+      );
       ScaffoldMessenger.of(context).showSnackBar(snack);
       if (success) {
         // Iniciar envío de ubicación en background automáticamente
@@ -40,7 +48,9 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e, st) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
       // ignore: avoid_print
       print('Login error: $e\n$st');
     }
@@ -73,7 +83,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 child: const Center(
-                  child: Text('LOGIN', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'LOGIN',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
 
@@ -82,7 +95,10 @@ class _LoginScreenState extends State<LoginScreen> {
               // Form area
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 18),
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 22,
+                ),
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -92,9 +108,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 6),
-                    CustomTextField(label: 'Usuario', controller: _userController),
+                    CustomTextField(
+                      label: 'Usuario',
+                      controller: _userController,
+                    ),
                     const SizedBox(height: 16),
-                    CustomTextField(label: 'Contraseña', controller: _passController, obscure: true),
+                    CustomTextField(
+                      label: 'Contraseña',
+                      controller: _passController,
+                      obscure: true,
+                    ),
                     const SizedBox(height: 24),
                     SizedBox(
                       width: width * 0.6,

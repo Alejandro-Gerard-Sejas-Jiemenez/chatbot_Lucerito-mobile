@@ -10,6 +10,8 @@ class Pedido {
   final String estado;
   final Ubicacion ubicacionLocal;
   final Ubicacion ubicacionCliente;
+  final String? nombreContacto;
+  final String? comentario;
 
   Pedido({
     required this.id,
@@ -19,6 +21,8 @@ class Pedido {
     required this.estado,
     required this.ubicacionLocal,
     required this.ubicacionCliente,
+    this.nombreContacto,
+    this.comentario,
   });
 
   factory Pedido.fromJson(Map<String, dynamic> json) {
@@ -36,12 +40,12 @@ class Pedido {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'usuario': usuario.toJson(),
-        'productos': productos.map((e) => e.toJson()).toList(),
-        'total': total,
-        'estado': estado,
-        'ubicacion_local': ubicacionLocal.toJson(),
-        'ubicacion_cliente': ubicacionCliente.toJson(),
-      };
+    'id': id,
+    'usuario': usuario.toJson(),
+    'productos': productos.map((e) => e.toJson()).toList(),
+    'total': total,
+    'estado': estado,
+    'ubicacion_local': ubicacionLocal.toJson(),
+    'ubicacion_cliente': ubicacionCliente.toJson(),
+  };
 }

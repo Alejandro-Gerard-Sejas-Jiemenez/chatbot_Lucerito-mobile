@@ -1,31 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../styles/app_colors.dart';
 import '../../styles/text_styles.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../screens/login_screen.dart';
 
-class MenuHeader extends StatefulWidget {
-  const MenuHeader({Key? key}) : super(key: key);
+class MenuHeader extends StatelessWidget {
+  final String username;
 
-  @override
-  State<MenuHeader> createState() => _MenuHeaderState();
-}
-
-class _MenuHeaderState extends State<MenuHeader> {
-  String? _username;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUsername();
-  }
-
-  Future<void> _loadUsername() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _username = prefs.getString('username') ?? '';
-    });
-  }
+  const MenuHeader({Key? key, this.username = ''}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +17,9 @@ class _MenuHeaderState extends State<MenuHeader> {
       decoration: const BoxDecoration(
         color: AppColors.primary,
         borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(16), bottomRight: Radius.circular(16)),
+          bottomLeft: Radius.circular(16),
+          bottomRight: Radius.circular(16),
+        ),
       ),
       child: Row(
         children: [
@@ -56,7 +39,10 @@ class _MenuHeaderState extends State<MenuHeader> {
               children: [
                 Transform.translate(
                   offset: const Offset(0, -45),
-                  child: Text('Hola: ${_username ?? ''}', style: TextStyles.title.copyWith(color: Colors.white)),
+                  child: Text(
+                    'Hola: $username',
+                    style: TextStyles.title.copyWith(color: Colors.white),
+                  ),
                 ),
               ],
             ),

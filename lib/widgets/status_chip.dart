@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
-import '../styles/app_colors.dart';
 
 class StatusChip extends StatelessWidget {
   final String text;
   final Color color;
   final IconData? icon;
 
-  const StatusChip({Key? key, required this.text, required this.color, this.icon}) : super(key: key);
+  const StatusChip({
+    Key? key,
+    required this.text,
+    required this.color,
+    this.icon,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +28,14 @@ class StatusChip extends StatelessWidget {
             Icon(icon, size: 14, color: color),
             const SizedBox(width: 6),
           ],
-          Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13)),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
         ],
       ),
     );

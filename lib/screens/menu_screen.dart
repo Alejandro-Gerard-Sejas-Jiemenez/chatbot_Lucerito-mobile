@@ -8,14 +8,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/models/pedido.dart';
 import '../data/models/usuario.dart';
 import '../data/models/ubicacion.dart';
+import '../data/models/traking.dart';
 import 'dart:async';
 import '../utils/location_helper.dart';
 import '../utils/background_location_sender.dart';
 import '../widgets/menu/menu_header.dart';
 import '../widgets/menu/stat_card.dart';
-import '../widgets/menu/assigned_orders_list.dart';
 import '../widgets/menu/completed_orders_list.dart';
-import '../widgets/menu/order_popup.dart';
 import 'mapa_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -33,6 +32,10 @@ class _MenuScreenState extends State<MenuScreen> {
   final LocationService _locationService = LocationService(
     baseUrl: ApiConfig.baseUrl,
   );
+  List<Map<String, dynamic>> _historial = [];
+  int _totalRegistros = 0;
+  bool _isLoadingHistorial = true;
+  String _deliveryUsername = '';
 
   @override
   void initState() {
@@ -40,6 +43,50 @@ class _MenuScreenState extends State<MenuScreen> {
     _startPolling();
     _setupBackgroundLocationCallback();
     LocationHelper.printCurrentLocation();
+    _cargarHistorial();
+  }
+
+  Future<void> _cargarHistorial() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deliveryIdStr = prefs.getString('delivery_id');
+
+      if (deliveryIdStr != null) {
+        final deliveryId = int.tryParse(deliveryIdStr);
+        if (deliveryId != null) {
+          final resultado = await _orderService.obtenerHistorialDelivery(
+            deliveryId,
+          );
+          if (resultado != null && mounted) {
+            setState(() {
+              _historial = List<Map<String, dynamic>>.from(
+                resultado['historial'] ?? [],
+              );
+              _totalRegistros = resultado['total_registros'] ?? 0;
+              _deliveryUsername = resultado['delivery_username'] ?? '';
+              _isLoadingHistorial = false;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error al cargar historial: $e');
+      if (mounted) {
+        setState(() => _isLoadingHistorial = false);
+      }
+    }
+  }
+
+  Future<void> _navegarAMapa(Pedido pedido) async {
+    final resultado = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => MapaScreen(pedido: pedido)),
+    );
+
+    // Si regresó del mapa, recargar el historial
+    if (resultado == true && mounted) {
+      await _cargarHistorial();
+    }
   }
 
   void _setupBackgroundLocationCallback() {
@@ -58,7 +105,7 @@ class _MenuScreenState extends State<MenuScreen> {
           );
           return;
         }
-        
+
         print('Widget montado, mostrando popup para orden #$idOrden');
         // Llamar directamente sin post frame callback
         _mostrarPopupOrden(idOrden);
@@ -94,6 +141,108 @@ class _MenuScreenState extends State<MenuScreen> {
     });
   }
 
+  // Método para procesar la aceptación de orden sin problemas de contexto
+  Future<void> _procesarAceptacionOrden(int idOrden, int deliveryId) async {
+    try {
+      // Aceptar la orden (actualizar estado)
+      final url = Uri.parse('${ApiConfig.baseUrl}/orden/$idOrden/estado');
+      final response = await http.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'estado': 'pendiente'}),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Orden aceptada exitosamente')),
+        );
+
+        // Obtener ubicación actual del delivery para crear el tracking
+        final currentPosition = await LocationHelper.getCurrentPosition();
+
+        // Crear tracking para la orden
+        final trackingData = Traking(
+          latitud: currentPosition?.latitude.toString() ?? '0.0',
+          longitud: currentPosition?.longitude.toString() ?? '0.0',
+          userDeliveryID: deliveryId.toString(),
+          estado: 'asignada',
+          ordenCod: idOrden.toString(),
+          comentario: 'Asignación automática',
+        );
+
+        print('Creando tracking para orden #$idOrden...');
+        final trackingId = await _orderService.createTracking(trackingData);
+
+        if (trackingId != null) {
+          print('Tracking creado con ID: $trackingId');
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt('tracking_id_$idOrden', trackingId);
+          await prefs.setString('delivery_id', deliveryId.toString());
+          print('Tracking ID guardado en SharedPreferences');
+        } else {
+          print('Advertencia: No se pudo crear el tracking');
+        }
+
+        // Obtener ubicación de la orden
+        final ubicacion = await _orderService.obtenerUbicacionOrden(idOrden);
+
+        if (!mounted) return;
+
+        if (ubicacion != null) {
+          final lat = ubicacion['latitud'];
+          final lng = ubicacion['longitud'];
+          final nombreContacto = ubicacion['nombre_contacto'] as String?;
+          final comentario = ubicacion['comentario'] as String?;
+
+          final pedidoSimulado = Pedido(
+            id: idOrden,
+            usuario: Usuario(
+              id: 0,
+              nombre: 'Desconocido',
+              correo: '',
+              telefono: '',
+              direccion: '',
+            ),
+            productos: [],
+            total: 0.0,
+            estado: 'pendiente',
+            ubicacionLocal: Ubicacion(
+              latitud: lat ?? 0.0,
+              longitud: lng ?? 0.0,
+            ),
+            ubicacionCliente: Ubicacion(
+              latitud: lat ?? 0.0,
+              longitud: lng ?? 0.0,
+            ),
+            nombreContacto: nombreContacto,
+            comentario: comentario,
+          );
+
+          await _navegarAMapa(pedidoSimulado);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No se pudo obtener la ubicación de la orden'),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error al aceptar la orden')),
+        );
+      }
+    } catch (e) {
+      print('Error al procesar aceptación de orden: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
   @override
   void dispose() {
     _pollingTimer?.cancel();
@@ -104,119 +253,77 @@ class _MenuScreenState extends State<MenuScreen> {
 
   void _mostrarPopupOrden(int idOrden) async {
     print('_mostrarPopupOrden llamado para orden #$idOrden');
-    
+
     // Guardar referencia al context antes de operaciones asíncronas
     final dialogContext = context;
-    
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString('jwt_token');
-        if (token == null) {
-          print('ERROR: No hay token JWT, no se puede mostrar el popup');
-          return;
-        }
-        final AuthService authService = AuthService();
-        final deliveryId = authService.getUserIdFromToken(token);
-        print('Delivery ID obtenido del token: $deliveryId');
-        if (deliveryId == null) {
-          print('ERROR: No se pudo extraer el ID del token, no se puede mostrar el popup');
-          return;
-        }
 
-        showDialog(
-          context: dialogContext,
-          barrierDismissible: false,
-          builder: (dialogCtx) {
-            print('Builder del AlertDialog ejecutado');
-            return AlertDialog(
-              title: const Text('Nueva orden asignada'),
-              content: Text('¿Deseas aceptar la orden #$idOrden?'),
-              actions: [
-                TextButton(
-                  onPressed: () async {
-                    Navigator.of(dialogCtx).pop();
-                    // Rechazar la orden
-                    final success = await _orderService.rejectOrder(
-                      idOrden,
-                      deliveryId,
-                    );
-                    if (!mounted) return;
-                    if (success) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Orden rechazada exitosamente'),
-                        ),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Error al rechazar la orden')),
-                      );
-                    }
-                  },
-                  child: const Text('Rechazar'),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    Navigator.of(dialogCtx).pop();
-                    // Aceptar la orden (actualizar estado a "en camino")
-                    final url = Uri.parse(
-                      '${ApiConfig.baseUrl}/orden/$idOrden/estado',
-                    );
-                    final response = await http.put(
-                      url,
-                      headers: {'Content-Type': 'application/json'},
-                      body: jsonEncode({'estado': 'pendiente'}),
-                    );
-                    if (!mounted) return;
-                    if (response.statusCode == 200) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Orden aceptada exitosamente'),
-                        ),
-                      );
-                      // Obtener ubicación de la orden desde el servicio
-                      final ubicacion = await _orderService.obtenerUbicacionOrden(idOrden);
-                      if (ubicacion != null) {
-                        final lat = ubicacion['latitud'];
-                        final lng = ubicacion['longitud'];
-                        // Crear objetos mínimos para Pedido
-                        final pedidoSimulado = Pedido(
-                          id: idOrden,
-                          usuario: Usuario(
-                            id: 0,
-                            nombre: 'Desconocido',
-                            correo: '',
-                            telefono: '',
-                            direccion: '',
-                          ),
-                          productos: [],
-                          total: 0.0,
-                          estado: 'pendiente',
-                          ubicacionLocal: Ubicacion(latitud: lat ?? 0.0, longitud: lng ?? 0.0),
-                          ubicacionCliente: Ubicacion(latitud: lat ?? 0.0, longitud: lng ?? 0.0),
-                        );
-                        print('Pedido simulado: ' + pedidoSimulado.toString());
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => MapaScreen(pedido: pedidoSimulado),
-                          ),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('No se pudo obtener la ubicación de la orden')),
-                        );
-                      }
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Error al aceptar la orden')),
-                      );
-                    }
-                  },
-                  child: const Text('Aceptar'),
-                ),
-              ],
-            );
-          },
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt_token');
+    if (token == null) {
+      print('ERROR: No hay token JWT, no se puede mostrar el popup');
+      return;
+    }
+    final AuthService authService = AuthService();
+    final deliveryId = authService.getUserIdFromToken(token);
+    print('Delivery ID obtenido del token: $deliveryId');
+    if (deliveryId == null) {
+      print(
+        'ERROR: No se pudo extraer el ID del token, no se puede mostrar el popup',
+      );
+      return;
+    }
+
+    showDialog(
+      context: dialogContext,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        print('Builder del AlertDialog ejecutado');
+        return AlertDialog(
+          title: const Text('Nueva orden asignada'),
+          content: Text('¿Deseas aceptar la orden #$idOrden?'),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                // Guardar referencias antes de cerrar el diálogo
+                final navigator = Navigator.of(dialogCtx);
+                final scaffoldMessenger = ScaffoldMessenger.of(dialogContext);
+
+                navigator.pop();
+
+                // Rechazar la orden
+                final success = await _orderService.rejectOrder(
+                  idOrden,
+                  deliveryId,
+                );
+                if (!mounted) return;
+                if (success) {
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Orden rechazada exitosamente'),
+                    ),
+                  );
+                } else {
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(content: Text('Error al rechazar la orden')),
+                  );
+                }
+              },
+              child: const Text('Rechazar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                // Cerrar el diálogo inmediatamente
+                Navigator.of(dialogCtx).pop();
+
+                // Procesar la aceptación en segundo plano
+                _procesarAceptacionOrden(idOrden, deliveryId);
+              },
+              child: const Text('Aceptar'),
+            ),
+          ],
         );
+      },
+    );
   }
 
   @override
@@ -229,30 +336,32 @@ class _MenuScreenState extends State<MenuScreen> {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                const MenuHeader(),
+                MenuHeader(username: _deliveryUsername),
                 Positioned(
                   bottom: 16,
                   left: 16,
                   right: 16,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      StatCard(title: 'Pendientes', value: ''),
-                      StatCard(title: 'En Camino', value: ''),
-                      StatCard(title: 'Hoy', value: ''),
+                    children: [
+                      const StatCard(title: 'Pendientes', value: '1'),
+                      const StatCard(title: 'En Camino', value: '1'),
+                      StatCard(title: 'Hoy', value: _totalRegistros.toString()),
                     ],
                   ),
                 ),
               ],
             ),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                children: const [AssignedOrdersList(), CompletedOrdersList()],
-              ),
+              child: _isLoadingHistorial
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      children: [CompletedOrdersList(historial: _historial)],
+                    ),
             ),
           ],
         ),
